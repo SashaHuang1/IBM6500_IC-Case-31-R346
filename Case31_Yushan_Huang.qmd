@@ -1,0 +1,224 @@
+---
+title: "Case 31 | Employees Federal Credit Union"
+subtitle: "R3, R6, and R4: Summary of Data Analysis"
+author: "Yushan Huang"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    theme: cosmo
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+library(haven)
+library(dplyr)
+library(knitr)
+file <- "Case 31 Data_efcu_4.sav"
+d <- as.data.frame(read_sav(file))
+# Standardize SPSS column names, which may differ in capitalization.
+names(d) <- toupper(trimws(names(d)))
+# Some SPSS exports use Q_3 instead of Q3, or Q9R instead of Q9_R.
+names(d) <- sub("^Q_([0-9]+)$", "Q\\1", names(d))
+names(d) <- sub("^Q([0-9]+)R$", "Q\\1_R", names(d))
+required <- c(paste0("Q", 3:6), "Q38", "Q9_R", "Q10_R",
+              "Q11", "Q12", paste0("Q", 31:34), "Q37_R",
+              paste0("Q", 13:26, "_R"))
+missing_vars <- setdiff(required, names(d))
+if (length(missing_vars)) {
+  stop("Missing variables: ", paste(missing_vars, collapse=", "),
+       "\nAvailable variables: ", paste(names(d), collapse=", "))
+}
+# Retain all 128 cases, regardless of the SPSS FILTER_$ variable.
+# haven's labelled columns can be treated as numeric for these analyses.
+d[] <- lapply(d, function(z) if (is.numeric(z)) as.numeric(z) else z)
+d$Att_Employee <- rowMeans(d[, paste0("Q",3:6)], na.rm=TRUE)
+d$Att_Employee[!is.finite(d$Att_Employee)] <- NA_real_
+d$Residence <- factor(d$Q38, levels=c(1,2), labels=c("Headquarters area","Elsewhere"))
+summary_table <- function(v) {
+  data.frame(Variable=v, N=sapply(d[v], function(z) sum(!is.na(z))),
+             Mean=sapply(d[v], function(z) mean(z,na.rm=TRUE)),
+             SD=sapply(d[v], function(z) sd(z,na.rm=TRUE))) |>
+    knitr::kable(digits=3)
+}
+frequency <- function(v) {
+  tab <- table(d[[v]], useNA="no")
+  knitr::kable(data.frame(Response=names(tab), N=as.integer(tab),
+                           Percent=round(100*as.numeric(prop.table(tab)),1)))
+}
+residence_test <- function(v) t.test(d[[v]] ~ d$Residence)
+```
+
+# Study overview
+
+The EFCU questionnaire assesses members' perceptions of employees, services, and operations. This report uses the 128 records in the supplied cleaned SPSS file. Descriptive results are presented first, followed by inferential analyses. Statistical significance is evaluated at alpha = .05. All analyses are exploratory and observational; differences do not establish causality.
+
+**Coding note.** The SPSS file contains previously recoded Q9_R, Q10_R, Q13_R–Q26_R and Q37_R variables. Their existing numeric codes are used. The neutral midpoint of five-point agreement items is 3. For chi-square goodness-of-fit tests, the null is an equal distribution across the *observed* response categories; this is a descriptive benchmark, not a substantive population expectation. Q12 = 3 is the 'No answer' category, not a substantive 'No'.
+
+## R3 — Employee proficiencies: descriptive statistics
+
+Members generally rate credit-union employees positively across courtesy, helpfulness, professionalism, and availability. The table reports the individual five-point items; higher scores indicate greater agreement.
+
+```{r}
+summary_table(paste0("Q",3:6))
+```
+
+
+## R3 — One-sample t-tests
+
+All four item means are above the neutral score of 3 (Q3: t(127) = 23.20, p < .001; Q4: t(127) = 21.34, p < .001; Q5: t(127) = 18.50, p < .001; Q6: t(127) = 15.44, p < .001). This supports a favorable overall evaluation of employee proficiency. The composite is used for the residence comparison in R4a.
+
+```{r}
+for (v in paste0("Q",3:6)) { cat("\n",v,"\n"); print(t.test(d[[v]], mu=3)) }
+```
+
+
+## R6 — Operational effectiveness: descriptive statistics
+
+Members evaluate several aspects of operational effectiveness. The pre-recoded variables Q9_R, Q10_R and Q37_R are retained as supplied; their scale directions should be interpreted with reference to the questionnaire and SPSS value labels. Q31–Q34 use five-point agreement responses.
+
+```{r}
+summary_table(c("Q9_R","Q10_R",paste0("Q",31:34),"Q37_R"))
+```
+
+
+## R6 — Frequency distribution and goodness-of-fit: Q9_R
+
+Response counts were 2: 29, 3: 99. The distribution is not uniform across the observed categories (χ²(1) = 38.28, p < .001). For Q11 and Q12, these categories should be interpreted as yes/no (and no answer for Q12).
+
+```{r}
+frequency("Q9_R")
+chisq.test(table(d$Q9_R))
+```
+
+
+## R6 — Frequency distribution and goodness-of-fit: Q10_R
+
+Response counts were 1: 2, 2: 4, 3: 54, 4: 68. The distribution is not uniform across the observed categories (χ²(3) = 108.25, p < .001). For Q11 and Q12, these categories should be interpreted as yes/no (and no answer for Q12).
+
+```{r}
+frequency("Q10_R")
+chisq.test(table(d$Q10_R))
+```
+
+
+## R6 — Frequency distribution and goodness-of-fit: Q11
+
+Response counts were 1: 125, 2: 3. The distribution is not uniform across the observed categories (χ²(1) = 116.28, p < .001). For Q11 and Q12, these categories should be interpreted as yes/no (and no answer for Q12).
+
+```{r}
+frequency("Q11")
+chisq.test(table(d$Q11))
+```
+
+
+## R6 — Frequency distribution and goodness-of-fit: Q12
+
+Response counts were 1: 74, 2: 32, 3: 22. The distribution is not uniform across the observed categories (χ²(2) = 35.69, p < .001). For Q11 and Q12, these categories should be interpreted as yes/no (and no answer for Q12).
+
+```{r}
+frequency("Q12")
+chisq.test(table(d$Q12))
+```
+
+
+## R6 — One-sample t-test: Q31
+
+The mean is 3.95; relative to a neutral reference value of 3, the test yields t(127) = 15.74, p < .001. This item is significantly above the reference point.
+
+```{r}
+t.test(d$Q31, mu=3)
+```
+
+
+## R6 — One-sample t-test: Q32
+
+The mean is 3.72; relative to a neutral reference value of 3, the test yields t(127) = 10.25, p < .001. This item is significantly above the reference point.
+
+```{r}
+t.test(d$Q32, mu=3)
+```
+
+
+## R6 — One-sample t-test: Q33
+
+The mean is 3.59; relative to a neutral reference value of 3, the test yields t(127) = 9.87, p < .001. This item is significantly above the reference point.
+
+```{r}
+t.test(d$Q33, mu=3)
+```
+
+
+## R6 — One-sample t-test: Q34
+
+The mean is 3.46; relative to a neutral reference value of 3, the test yields t(127) = 6.66, p < .001. This item is significantly above the reference point.
+
+```{r}
+t.test(d$Q34, mu=3)
+```
+
+
+## R6 — One-sample t-test: Q37_R
+
+The mean is 4.07; relative to a neutral reference value of 3, the test yields t(120) = 16.12, p < .001. This item is significantly above the reference point.
+
+```{r}
+t.test(d$Q37_R, mu=3)
+```
+
+
+## R4a — Employee proficiency by residence
+
+The four-item employee proficiency mean was compared across the headquarters-area and elsewhere groups. HQ M = 4.28 (n=57), elsewhere M = 4.14 (n=71); Welch t = 1.30, p = 0.195. This comparison addresses whether the groups differ in their assessment of staff.
+
+```{r}
+aggregate(Att_Employee ~ Residence, d, function(z) c(N=length(z), Mean=mean(z), SD=sd(z)))
+residence_test("Att_Employee")
+```
+
+
+## R4b — Awareness of services by residence
+
+The table compares the percentage who were aware of and had used each service (response code 1). Each service also receives a separate Pearson chi-square test across all three awareness categories (used, aware/not used, unaware). At the unadjusted .05 level, no individual service meets the .05 threshold. Because 14 tests are conducted, these comparisons are exploratory; small expected counts may make asymptotic p-values unreliable.
+
+```{r}
+service_names <- c("Regular share accounts", "Special subaccounts", "Christmas club accounts", "Individual retirement accounts", "MasterCard credit cards", "Signature loans", "New car loans", "Late-model car loans", "Older-model car loans", "Household-goods/appliance loans", "Recreational loans", "Share-collateralized loans", "IRA loans", "Line-of-credit loans")
+service_results <- lapply(13:26, function(i) {
+ v <- paste0("Q",i,"_R")
+ tab <- table(d$Residence, d[[v]])
+ test <- suppressWarnings(chisq.test(tab, correct=FALSE))
+ data.frame(Service=service_names[i-12], HQ_used=mean(d[[v]][d$Q38==1]==1,na.rm=TRUE)*100, Elsewhere_used=mean(d[[v]][d$Q38==2]==1,na.rm=TRUE)*100, Chi_square=unname(test$statistic), p=test$p.value, Min_expected=min(test$expected))
+})
+knitr::kable(do.call(rbind,service_results),digits=3)
+```
+
+
+## R4c — Operational effectiveness by residence
+
+Operational effectiveness is examined using independent-group comparisons for recoded statement frequency and clarity (Q9_R, Q10_R), employee and loan-related performance (Q31–Q34), and overall management rating (Q37_R), plus independence tests for Q11 and Q12. Among these nine unadjusted comparisons, Q34 (ease of completing loan applications) differs by residence (headquarters mean 3.28 versus elsewhere mean 3.61, Welch p = .025); the remaining item tests are not significant at .05. Because multiple outcomes are tested, the isolated Q34 result warrants caution. These are item-level comparisons rather than a single unvalidated composite.
+
+```{r}
+for (v in c("Q9_R","Q10_R",paste0("Q",31:34),"Q37_R")) { cat("\n",v,"\n"); print(residence_test(v)) }
+for (v in c("Q11","Q12")) { cat("\n",v,"\n"); print(table(d$Residence,d[[v]])); print(chisq.test(table(d$Residence,d[[v]]),correct=FALSE)) }
+```
+
+
+# Appendix — Publication links
+
+- **GitHub repository:** [Add your repository URL here](https://github.com/)
+- **GitHub Pages:** [Add your published report URL here](https://pages.github.com/)
+
+*Replace both placeholders with your actual links after publishing. This report has not been published to your account.*
+
+# Methodological notes
+
+- The supplied SPSS dataset contains 128 records; analyses use all records, not the existing `FILTER_$` flag.
+- The one-sample t-tests compare item means with the scale midpoint, 3. For the recoded Q37_R this is a reference point, but the no-opinion category requires caution.
+- For Q9_R, a midpoint of 3 is not assumed; the goodness-of-fit test uses observed categories.
+- Chi-square tests are sensitive to small expected cell counts; review `Min_expected` in the R4b output.
+- The analysis does not repeat factor analysis or reliability analysis from the prior assignment.
